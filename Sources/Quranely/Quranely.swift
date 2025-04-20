@@ -4,11 +4,10 @@
 import Foundation
 
 public final class Quranely {
-    @MainActor public static let shared = Quranely()
 
     private var surahs: [Int: SurahMeta] = [:]
 
-    private init() {
+     init() {
         loadSurahs()
     }
 
