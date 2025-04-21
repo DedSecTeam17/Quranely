@@ -7,13 +7,21 @@
 
 import Foundation
 
+public struct Verse: Codable {
+    public let surah_number: Int
+    public let verse_number: Int
+    public let content: String
+    
+    public init(surah_number: Int, verse_number: Int, content: String) {
+        self.surah_number = surah_number
+        self.verse_number = verse_number
+        self.content = content
+    }
+}
+
 public final class QuranVerses {
     
-    public struct Verse: Codable {
-        let surah_number: Int
-        let verse_number: Int
-        let content: String
-    }
+
 
     private var verses: [Verse] = []
 
