@@ -16,7 +16,7 @@ public final class QuranTranslation {
     }
 
     private func loadTranslations() {
-        guard let url = Bundle.module.url(forResource: "Fadel Soliman, Bridges’ translation.translation-with-footnote-tags", withExtension: "json"),
+        guard let url = Bundle.module.url(forResource: "english_translation", withExtension: "json"),
               let rawData = try? Data(contentsOf: url),
               let rawMap = try? JSONDecoder().decode([String: [String: String]].self, from: rawData) else {
             print("❌ Failed to load Translation.json")

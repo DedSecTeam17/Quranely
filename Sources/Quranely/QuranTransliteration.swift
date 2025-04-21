@@ -15,7 +15,7 @@ public final class QuranTransliteration {
     }
 
     private func loadTransliteration() {
-        guard let url = Bundle.module.url(forResource: "Transliteration", withExtension: "json"),
+        guard let url = Bundle.module.url(forResource: "transliteration", withExtension: "json"),
               let rawData = try? Data(contentsOf: url),
               let rawMap = try? JSONDecoder().decode([String: [String: String]].self, from: rawData) else {
             print("❌ Failed to load Transliteration.json")
