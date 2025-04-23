@@ -67,7 +67,7 @@ public final class QuranAudioPlayer: ObservableObject {
                   duration > 0 else { return }
 
             self.progress = time.seconds / duration
-            if self.progress >= 0.999 {
+            if self.progress >= 0.9 {
                 self.isPlaying = false
                 self.progress = 1.0
             } else {
