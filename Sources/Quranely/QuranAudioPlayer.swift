@@ -1,42 +1,39 @@
+import Foundation
 import AVFoundation
 import Combine
 
-public class QuranAudioPlayer: ObservableObject {
+public final class QuranAudioPlayer: ObservableObject {
     private let versesManager: QuranVerses
     private var player: AVPlayer?
-    private var cancellables = Set<AnyCancellable>()
+    private var timeObserverToken: Any?
+    private var isObserving = false
 
-    // Public state
+    // MARK: - Public State
     @Published public var isPlaying: Bool = false
     @Published public private(set) var currentSurah: Int = 1
     @Published public private(set) var currentVerse: Int = 1
-    @Published public private(set) var currentText: String = ""
+    @Published public var progress: Double = 0.0 // Range: 0.0 to 1.0
 
+    // MARK: - Init
     public init(versesManager: QuranVerses = QuranVerses()) {
         self.versesManager = versesManager
-        loadCurrentVerse()
     }
 
-    // MARK: - Control
-    
+    // MARK: - Set Current Ayah
     public func set(surah: Int, verse: Int) {
         currentSurah = surah
         currentVerse = verse
-        loadCurrentVerse()
     }
 
+    // MARK: - Playback Control
     @MainActor public func play() {
         guard let url = versesManager.getAudioURL(surah: currentSurah, verse: currentVerse) else { return }
 
+        stop() // Stop previous if any
         player = AVPlayer(url: url)
+        addPeriodicTimeObserver()
         player?.play()
         isPlaying = true
-
-        NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime)
-            .sink { [weak self] _ in
-                self?.next()
-            }
-            .store(in: &cancellables)
     }
 
     @MainActor public func pause() {
@@ -44,35 +41,45 @@ public class QuranAudioPlayer: ObservableObject {
         isPlaying = false
     }
 
+    @MainActor public func stop() {
+        player?.pause()
+        player?.replaceCurrentItem(with: nil)
+        removeObserver()
+        isPlaying = false
+        progress = 0.0
+    }
+
     @MainActor public func toggle() {
         isPlaying ? pause() : play()
     }
 
-    @MainActor public func next() {
-        if let _ = versesManager.getVerse(surah: currentSurah, verse: currentVerse + 1) {
-            currentVerse += 1
-            loadCurrentVerse()
-            play()
-        } else {
-            pause()
+    // MARK: - Time Observation
+    private func addPeriodicTimeObserver() {
+        guard let player = player, !isObserving else { return }
+
+        let interval = CMTime(seconds: 0.5, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
+        timeObserverToken = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
+            guard let self = self,
+                  let duration = player.currentItem?.duration.seconds,
+                  duration > 0 else { return }
+
+            self.progress = time.seconds / duration
+        }
+
+        isObserving = true
+    }
+
+    private func removeObserver() {
+        if let token = timeObserverToken {
+            player?.removeTimeObserver(token)
+            timeObserverToken = nil
+            isObserving = false
         }
     }
 
-    @MainActor public func previous() {
-        if currentVerse > 1 {
-            currentVerse -= 1
-            loadCurrentVerse()
-            play()
-        }
-    }
-
-    // MARK: - Internal
-
-    private func loadCurrentVerse() {
-        if let verse = versesManager.getVerse(surah: currentSurah, verse: currentVerse) {
-            currentText = verse.content
-        } else {
-            currentText = "Verse not found"
-        }
+    // MARK: - Cleanup
+    deinit {
+        removeObserver()
+        player = nil
     }
 }
