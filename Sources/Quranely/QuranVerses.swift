@@ -70,9 +70,19 @@ public final class QuranVerses {
     }
 }
 
-public enum Reciter: String {
+public enum Reciter: String, CaseIterable {
     case rifai = "Rifai"
     case abdulBasetMujawwad = "AbdulBaset/Mujawwad"
     case sudais = "Sudais"
     case minshawiMujawwad = "Minshawi/Mujawwad"
+
+    // Exact, case-insensitive match; defaults to abdulBasetMujawwad
+    public init(from string: String) {
+        if let found = Reciter.allCases.first(where: { $0.rawValue.compare(string, options: .caseInsensitive) == .orderedSame }) {
+            self = found
+        } else {
+            self = .abdulBasetMujawwad
+        }
+    }
 }
+
