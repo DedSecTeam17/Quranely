@@ -62,4 +62,17 @@ public final class QuranVerses {
         guard let index = getGlobalVerseIndex(surah: surah, verse: verse) else { return nil }
         return URL(string: "https://cdn.islamic.network/quran/audio/128/ar.alafasy/\(index).mp3")
     }
+    
+    public func getAudioURL(surah: Int, verse: Int, reciter: Reciter) -> URL? {
+        let surahStr = String(format: "%03d", surah)
+        let ayahStr = String(format: "%03d", verse)
+        return URL(string: "https://verses.quran.com/\(reciter.rawValue)/mp3/\(surahStr)\(ayahStr).mp3")
+    }
+}
+
+public enum Reciter: String {
+    case rifai = "Rifai"
+    case abdulBasetMujawwad = "AbdulBaset/Mujawwad"
+    case sudais = "Sudais"
+    case minshawiMujawwad = "Minshawi/Mujawwad"
 }
