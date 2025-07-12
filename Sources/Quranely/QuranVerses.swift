@@ -86,3 +86,4 @@ public enum Reciter: String, CaseIterable {
     }
 }
 
+// Rifai - AbdulBaset/Mujawwad - Sudais - Minshawi/Mujawwad
