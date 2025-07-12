@@ -12,6 +12,7 @@ It loads JSON files bundled with your app and allows you to query the Quran in a
 - ✅ All Quranic verses with offline access
 - ✅ Transliteration support per verse
 - ✅ English translation (Bridges' by Fadel Soliman)
+- ✅ English Tafsir Ibn Kathir
 - ✅ Centralized access via `QuranelyFactory`
 - ✅ Clean Swift architecture (modular, testable, SPM ready)
 
