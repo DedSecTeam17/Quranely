@@ -7,41 +7,67 @@
 
 import Foundation
 
+
+import Foundation
+
+public enum TranslationType: String, CaseIterable {
+    case translationBridges = "translation_bridges"
+    case translationSahihInternational = "translation_sahih_international"
+    case translationYusufali = "translation_yusufali"
+}
+
+
+
 public final class QuranTranslation {
-
-    private var data: [String: Translation] = [:]
-
-     init() {
-        loadTranslations()
+    
+    // Now stores translations by type
+    private var data: [TranslationType: [String: Translation]] = [:]
+    
+    public init() {
+        loadAllTranslations()
+    }
+    
+    private func loadAllTranslations() {
+        for type in TranslationType.allCases {
+            let result = loadTranslations(from: type)
+            data[type] = result
+        }
     }
 
-    private func loadTranslations() {
-        guard let url = Bundle.module.url(forResource: "english_translation", withExtension: "json"),
+    private func loadTranslations(from type: TranslationType) -> [String: Translation] {
+        guard let url = Bundle.module.url(
+            forResource: type.rawValue,
+            withExtension: "json"
+        ),
               let rawData = try? Data(contentsOf: url),
               let rawMap = try? JSONDecoder().decode([String: [String: String]].self, from: rawData) else {
-            print("❌ Failed to load Translation.json")
-            return
+            print("❌ Failed to load \(type.rawValue).json")
+            return [:]
         }
 
-        self.data = rawMap.compactMapValues { dict in
+        return rawMap.compactMapValues { dict in
             if let text = dict["t"] {
-                return Translation(id: dict.keys.first ?? "", text: text)
+                let id = dict.keys.first ?? ""
+                return Translation(id: id, text: text)
             }
             return nil
         }
     }
 
-    public func getAll(forSurah surah: Int) -> [Translation] {
-        return data.values
+    // MARK: - Accessors
+    
+    public func getAll(forSurah surah: Int, type: TranslationType = .translationBridges) -> [Translation] {
+        return data[type]?
+            .values
             .filter { $0.surah == surah }
-            .sorted { $0.verse < $1.verse }
+            .sorted { $0.verse < $1.verse } ?? []
     }
 
-    public func get(surah: Int, verse: Int) -> Translation? {
-        return data["\(surah):\(verse)"]
+    public func get(surah: Int, verse: Int, type: TranslationType = .translationBridges) -> Translation? {
+        return data[type]?["\(surah):\(verse)"]
     }
 
-    public func search(_ keyword: String) -> [Translation] {
-        return data.values.filter { $0.text.lowercased().contains(keyword.lowercased()) }
+    public func search(_ keyword: String, type: TranslationType = .translationBridges) -> [Translation] {
+        return data[type]?.values.filter { $0.text.localizedCaseInsensitiveContains(keyword) } ?? []
     }
 }
