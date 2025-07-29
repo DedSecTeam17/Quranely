@@ -9,9 +9,8 @@ import Foundation
 
 public enum TafseerType: String, CaseIterable {
     case englishIbnKathir = "en_tafisr_ibn_kathir"
-    case arabicIbnKathir = "ar_tafisr_ibn_kathir"
     case turkishIbnKathir = "turkish_tafisr_ibn_kathir"
-    // Add more tafseer files here if needed
+    case arabicIbnKathir = "ar_tafisr_ibn_kathir"
 }
 
 public final class QuranTafseer {
@@ -33,19 +32,27 @@ public final class QuranTafseer {
     }
 
     private func loadTafseer(from type: TafseerType) -> [String: Tafseer] {
-        guard let url = Bundle.module.url(forResource: type.rawValue, withExtension: "json"),
-              let rawData = try? Data(contentsOf: url),
-              let rawMap = try? JSONDecoder().decode([String: [String: String]].self, from: rawData) else {
+        guard let url = Bundle.module.url(forResource: type.rawValue, withExtension: "json") else {
             print("❌ Failed to load \(type.rawValue).json")
             return [:]
         }
+        do {
+            let rawData = try Data(contentsOf: url)
+            let rawMap = try JSONDecoder().decode([String: [String: String]].self, from: rawData)
 
-        return rawMap.compactMapValues { dict in
-            if let text = dict["text"] {
-                let id = dict.keys.first ?? ""
-                return Tafseer(id: id, text: text)
-            }
-            return nil
+      return rawMap.compactMapValues { dict in
+          if let text = dict["text"] {
+              let id = dict.keys.first ?? ""
+              return Tafseer(id: id, text: text)
+          }
+          return nil
+      }
+        } catch {
+            print(
+                "❌ Failed to load \(type.rawValue).json \(error.localizedDescription)"
+            )
+            dump(error)
+            return [:]
         }
     }
 
