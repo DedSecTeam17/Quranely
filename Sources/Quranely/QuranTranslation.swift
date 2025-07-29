@@ -14,6 +14,7 @@ public enum TranslationType: String, CaseIterable {
     case translationBridges = "translation_bridges"
     case translationSahihInternational = "translation_sahih_international"
     case translationYusufali = "translation_yusufali"
+    case darAlSalamCenter = "dar_al_salam_center"
 }
 
 

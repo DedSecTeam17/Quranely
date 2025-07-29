@@ -7,23 +7,40 @@
 
 import Foundation
 
+public enum TafseerType: String, CaseIterable {
+    case englishIbnKathir = "en_tafisr_ibn_kathir"
+    case arabicIbnKathir = "ar_tafisr_ibn_kathir"
+    case turkishIbnKathir = "turkish_tafisr_ibn_kathir"
+    // Add more tafseer files here if needed
+}
+
 public final class QuranTafseer {
 
-    private var data: [String: Tafseer] = [:]
+    // Stores tafseer by type
+    private var data: [TafseerType: [String: Tafseer]] = [:]
 
-     init() {
-         loadTafseer()
+    public init() {
+        loadAllTafseers()
     }
 
-    private func loadTafseer() {
-        guard let url = Bundle.module.url(forResource: "en_tafisr_ibn_kathir", withExtension: "json"),
+    // MARK: - Loaders
+
+    private func loadAllTafseers() {
+        for type in TafseerType.allCases {
+            let result = loadTafseer(from: type)
+            data[type] = result
+        }
+    }
+
+    private func loadTafseer(from type: TafseerType) -> [String: Tafseer] {
+        guard let url = Bundle.module.url(forResource: type.rawValue, withExtension: "json"),
               let rawData = try? Data(contentsOf: url),
               let rawMap = try? JSONDecoder().decode([String: [String: String]].self, from: rawData) else {
-            print("❌ Failed to load Tafseeer")
-            return
+            print("❌ Failed to load \(type.rawValue).json")
+            return [:]
         }
 
-        self.data = rawMap.compactMapValues { dict in
+        return rawMap.compactMapValues { dict in
             if let text = dict["text"] {
                 let id = dict.keys.first ?? ""
                 return Tafseer(id: id, text: text)
@@ -32,17 +49,20 @@ public final class QuranTafseer {
         }
     }
 
-    public func getAll(forSurah surah: Int) -> [Tafseer] {
-        return data.values
+    // MARK: - Accessors
+
+    public func getAll(forSurah surah: Int, type: TafseerType = .englishIbnKathir) -> [Tafseer] {
+        return data[type]?
+            .values
             .filter { $0.surah == surah }
-            .sorted { $0.verse < $1.verse }
+            .sorted { $0.verse < $1.verse } ?? []
     }
 
-    public func get(surah: Int, verse: Int) -> Tafseer? {
-        return data["\(surah):\(verse)"]
+    public func get(surah: Int, verse: Int, type: TafseerType = .englishIbnKathir) -> Tafseer? {
+        return data[type]?["\(surah):\(verse)"]
     }
 
-    public func search(_ keyword: String) -> [Tafseer] {
-        return data.values.filter { $0.text.lowercased().contains(keyword.lowercased()) }
+    public func search(_ keyword: String, type: TafseerType = .englishIbnKathir) -> [Tafseer] {
+        return data[type]?.values.filter { $0.text.localizedCaseInsensitiveContains(keyword) } ?? []
     }
 }
