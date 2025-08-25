@@ -9,6 +9,9 @@ import Foundation
 
 public enum TafseerType: String, CaseIterable {
     case arabicMukhtasar  = "arabic_al_mukhtasar"
+    case arAbuBakrJabir = "ar-abu-bakr-jabir-al-jazairi"
+    case turkishAsSaadi = "tr-tafsir-as-saadi"
+    case englishIbnKathir = "en-tafisr-ibn-kathir"
 }
 
 // MARK: - Repo
