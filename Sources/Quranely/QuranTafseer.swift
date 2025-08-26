@@ -7,6 +7,8 @@
 
 import Foundation
 
+// MARK: - Types
+
 public enum TafseerType: String, CaseIterable {
     case arabicMukhtasar  = "arabic_al_mukhtasar"
     case arAbuBakrJabir = "ar-abu-bakr-jabir-al-jazairi"
@@ -14,7 +16,6 @@ public enum TafseerType: String, CaseIterable {
     case englishIbnKathir = "en-tafisr-ibn-kathir"
 }
 
-// MARK: - Repo
 public final class QuranTafseer {
     // type → "s:a" → Tafseer
     private var data: [TafseerType: [String: Tafseer]] = [:]
@@ -31,9 +32,9 @@ public final class QuranTafseer {
     }
 
     /// Raw JSON accepts:
-    /// - { "text": "…" } objects
-    /// - "…plain text…" strings
-    /// - "s:a" alias strings (e.g., "2:4": "2:3")
+    /// - OBJECT: { "text": "…", "ayah_keys": ["s:a", ...] }
+    /// - PLAIN  : "…text…"
+    /// - ALIAS  : "s:a" (e.g., "2:46": "2:45")
     private func loadTafseer(from type: TafseerType) -> [String: Tafseer] {
         guard let url = Bundle.module.url(forResource: type.rawValue, withExtension: "json") else {
             print("❌ \(type.rawValue).json not found in resources")
@@ -42,21 +43,44 @@ public final class QuranTafseer {
 
         do {
             let bytes = try Data(contentsOf: url)
-            // Decode heterogenous map
             let raw = try JSONDecoder().decode([String: RawValue].self, from: bytes)
 
-            // 1) Build a text cache by resolving each key (memoized, alias-safe)
-            var memo: [String: String] = [:]
+            // Resolve final text for every key (handles alias chains & plain strings)
+            var memoText: [String: String] = [:]
+
             var out: [String: Tafseer] = [:]
             out.reserveCapacity(raw.count)
 
             for key in raw.keys {
-                if let finalText = resolveText(for: key, in: raw, memo: &memo) {
-                    if let t = makeTafseer(id: key, text: finalText) {
-                        out[key] = t
+                guard let txt = resolveText(for: key, in: raw, memo: &memoText),
+                      let base = makeTafseer(id: key, text: txt) else { continue }
+
+                // determine ayahKeys to attach
+                let ayahKeys: [String]
+                switch raw[key]! {
+                case .object(let obj):
+                    // canonical/object verse → return its own group
+                    ayahKeys = (obj.ayah_keys ?? [key]).sorted()
+
+                case .text(let s):
+                    if isAyahKey(s), case .object(let targetObj)? = raw[s] {
+                        // alias → copy from the target object's ayah_keys
+                        ayahKeys = (targetObj.ayah_keys ?? [s]).sorted()
+                    } else {
+                        // plain text → no group
+                        ayahKeys = []
                     }
                 }
+
+                out[key] = Tafseer(
+                    id: base.id,
+                    surah: base.surah,
+                    verse: base.verse,
+                    text: base.text,
+                    ayahKeys: ayahKeys
+                )
             }
+
             return out
 
         } catch {
@@ -65,7 +89,7 @@ public final class QuranTafseer {
         }
     }
 
-    // MARK: - Accessors
+    // MARK: - Public Accessors
 
     public func getAll(forSurah surah: Int, type: TafseerType = .arabicMukhtasar) -> [Tafseer] {
         if let cached = bySurahCache[type]?[surah] { return cached }
@@ -90,12 +114,12 @@ public final class QuranTafseer {
     private func makeTafseer(id: String, text: String) -> Tafseer? {
         let parts = id.split(separator: ":")
         guard parts.count == 2, let s = Int(parts[0]), let a = Int(parts[1]) else { return nil }
-        return Tafseer(id: id, surah: s, verse: a, text: text)
+        return Tafseer(id: id, surah: s, verse: a, text: text, ayahKeys: [])
     }
 
-    /// Recursively resolve a key to its final text:
-    /// - If value is object → return its `text`
-    /// - If value is string:
+    /// Final text resolver with memoization and cycle detection.
+    /// - If value is OBJECT → return its `text`
+    /// - If value is STRING:
     ///     - If looks like "s:a" and exists → follow alias
     ///     - Else → treat as plain text
     private func resolveText(for key: String,
@@ -107,39 +131,28 @@ public final class QuranTafseer {
             print("⚠️ Alias cycle detected at \(key); skipping.")
             return nil
         }
-        visiting.insert(key)
-        defer { visiting.remove(key) }
+        visiting.insert(key); defer { visiting.remove(key) }
 
         guard let val = raw[key] else { return nil }
         switch val {
         case .text(let s):
             if isAyahKey(s), raw[s] != nil {
-                // s is an alias; follow it
                 if let txt = resolveText(for: s, in: raw, memo: &memo, visiting: &visiting) {
                     memo[key] = txt
                     return txt
                 }
                 return nil
             } else {
-                // plain text
                 memo[key] = s
                 return s
             }
 
         case .object(let obj):
-            // fan-out if ayah_keys present; otherwise use current key only
-            let text = obj.text
-            memo[key] = text
-            if let keys = obj.ayah_keys {
-                for k in keys where memo[k] == nil {
-                    memo[k] = text
-                }
-            }
-            return text
+            memo[key] = obj.text
+            return obj.text
         }
     }
 
-    // Convenience overload that starts with empty 'visiting'
     private func resolveText(for key: String,
                              in raw: [String: RawValue],
                              memo: inout [String: String]) -> String? {
@@ -149,14 +162,14 @@ public final class QuranTafseer {
 
     private func isAyahKey(_ s: String) -> Bool {
         let parts = s.split(separator: ":")
-        if parts.count != 2 { return false }
+        guard parts.count == 2 else { return false }
         return Int(parts[0]) != nil && Int(parts[1]) != nil
     }
 
     // Heterogeneous value: either object { text, ayah_keys? } or a String
     private enum RawValue: Decodable {
-        case text(String)
-        case object(Obj)
+        case text(String)   // alias "s:a" or plain string
+        case object(Obj)    // { text, ayah_keys? }
 
         struct Obj: Decodable {
             let text: String
@@ -167,9 +180,9 @@ public final class QuranTafseer {
             let single = try decoder.singleValueContainer()
             if let s = try? single.decode(String.self) {
                 self = .text(s)
-                return
+            } else {
+                self = .object(try Obj(from: decoder))
             }
-            self = .object(try Obj(from: decoder))
         }
     }
 }
